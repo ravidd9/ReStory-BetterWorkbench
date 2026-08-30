@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using Restory.Data.Devices;
@@ -64,11 +63,16 @@ internal static class PackageTooltipDetails
     {
         MethodInfo createTooltip = AccessTools.Method(typeof(InteractiveObjectsTooltipsService), CreateTooltipName);
 
-        if (createTooltip != null && MessageText != null
-            && createTooltip.GetParameters().Any(parameter => parameter.Name == DeviceContainerName)
-            && InjectedFieldNames.All(name =>
-                AccessTools.Field(typeof(InteractiveObjectsTooltipsService), name) != null))
+        bool hasPatchTarget = createTooltip != null
+                              && HasParameterNamed(createTooltip, DeviceContainerName);
+
+        bool hasMessageField = MessageText != null;
+        bool hasEveryInjectedField = HasEveryInjectedField();
+
+        if (hasPatchTarget && hasMessageField && hasEveryInjectedField)
+        {
             return true;
+        }
 
         Log.Error("Package tooltip details are disabled: InteractiveObjectsTooltipsService.CreateTooltip, one of "
             + "the members it is patched with, or GUI_DeliveryBoxMainTooltip.messageText is missing, most likely "
@@ -112,9 +116,15 @@ internal static class PackageTooltipDetails
 
         string services = $"{Strings.Services}: {ServicesLine(workTypes, deviceContainer, localization)}";
 
-        if (calendar == null || emailOrders == null
-            || !emailOrders.TryToGetOrderForDeviceContainer(deviceContainer, out TrackedEmailOrder tracked)
-            || tracked.Order.DeviceDeliveredToStoreDateTime == DateTime.MaxValue)
+        if (calendar == null || emailOrders == null)
+            return services;
+
+        if (!emailOrders.TryToGetOrderForDeviceContainer(deviceContainer, out TrackedEmailOrder tracked))
+            return services;
+
+        bool isDeliveryDateUnset = tracked.Order.DeviceDeliveredToStoreDateTime == DateTime.MaxValue;
+
+        if (isDeliveryDateUnset)
             return services;
 
         int day = DayInWork(tracked.Order.DeviceDeliveredToStoreDateTime, calendar.CurrentDateTime);
@@ -139,14 +149,53 @@ internal static class PackageTooltipDetails
     }
 
     private static string ServicesLine(IEnumerable<DeviceWorkType> workTypes, DeviceContainer deviceContainer,
-        LocalizationSystem localization) =>
-        string.Join(", ", workTypes.GetUniqueWorkTypesAndTheirCompletionStatus(deviceContainer)
-            .Select(service => Emphasized(localization.GetTranslation(service.Key.LocalizationKey),
-                isStillNeeded: !service.Value))
-            .ToArray());
+        LocalizationSystem localization)
+    {
+        List<string> serviceNames = new List<string>();
 
-    private static string Emphasized(string service, bool isStillNeeded) =>
-        isStillNeeded ? $"<b>{service}</b>" : service;
+        foreach (var service in workTypes.GetUniqueWorkTypesAndTheirCompletionStatus(deviceContainer))
+        {
+            string translatedName = localization.GetTranslation(service.Key.LocalizationKey);
+            bool isStillNeeded = !service.Value;
 
-    private static int DayInWork(DateTime deliveredToStore, DateTime now) => (now - deliveredToStore).Days + 1;
+            serviceNames.Add(Emphasized(translatedName, isStillNeeded));
+        }
+
+        return string.Join(", ", serviceNames);
+    }
+
+    private static string Emphasized(string service, bool isStillNeeded)
+    {
+        if (isStillNeeded)
+            return $"<b>{service}</b>";
+
+        return service;
+    }
+
+    private static int DayInWork(DateTime deliveredToStore, DateTime now)
+    {
+        return (now - deliveredToStore).Days + 1;
+    }
+
+    private static bool HasParameterNamed(MethodInfo method, string parameterName)
+    {
+        foreach (ParameterInfo parameter in method.GetParameters())
+        {
+            if (parameter.Name == parameterName)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasEveryInjectedField()
+    {
+        foreach (string fieldName in InjectedFieldNames)
+        {
+            if (AccessTools.Field(typeof(InteractiveObjectsTooltipsService), fieldName) == null)
+                return false;
+        }
+
+        return true;
+    }
 }

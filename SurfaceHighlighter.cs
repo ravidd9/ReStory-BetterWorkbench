@@ -19,7 +19,7 @@ internal static class SurfaceHighlighter
     private static MethodInfo _resolveSelection;
     private static MethodInfo _resolveHighlight;
 
-    internal static bool IsOn;
+    internal static bool IsOn { get; private set; }
 
     private static bool Prepare()
     {
@@ -27,13 +27,14 @@ internal static class SurfaceHighlighter
         _resolveSelection = AccessTools.DeclaredMethod(typeof(ElementView), "ResolveSelectionStateChanged");
         _resolveHighlight = AccessTools.DeclaredMethod(typeof(ElementView), "ResolveHighlightedStateChanged");
 
-        bool hasEveryMember = _applyConditionPreset != null
-                              && _resolveSelection != null
-                              && _resolveHighlight != null
-                              && AccessTools.Field(typeof(ElementView), AdapterFieldName) != null
-                              && AccessTools.Field(typeof(ElementView), ElementFieldName) != null;
+        bool hasEveryOutlineMethod = _applyConditionPreset != null
+                                     && _resolveSelection != null
+                                     && _resolveHighlight != null;
 
-        if (!hasEveryMember)
+        bool hasEveryOutlineField = AccessTools.Field(typeof(ElementView), AdapterFieldName) != null
+                                    && AccessTools.Field(typeof(ElementView), ElementFieldName) != null;
+
+        if (!hasEveryOutlineMethod || !hasEveryOutlineField)
         {
             Log.Warning("Bench highlights are disabled: ElementView is missing an outline field or "
                         + "method, most likely renamed by a game update. "
@@ -126,8 +127,9 @@ internal static class SurfaceHighlighter
             return;
 
         ElementBase element = _elementField(__instance);
+        bool isUnselectedPartOnBench = element && element.IsOnSurface && !element.IsSelected;
 
-        if (element && element.IsOnSurface && !element.IsSelected)
+        if (isUnselectedPartOnBench)
         {
             Highlight(__instance);
         }

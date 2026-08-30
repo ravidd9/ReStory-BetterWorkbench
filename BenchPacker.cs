@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 namespace ReStoryBetterWorkbench;
@@ -9,6 +8,12 @@ internal static class BenchPacker
     private const float MinCellExtent = 0.001f;
     private const float MaxSideMarginFraction = 0.4f;
     private const float MaxTopMarginFraction = 0.8f;
+
+    private const float SelfCheckTolerance = 0.001f;
+    private const float SelfCheckPartExtent = 0.25f;
+    private const float SelfCheckBenchHalfExtent = 0.5f;
+    private const int SelfCheckPartCount = 20;
+    private const int SelfCheckExpectedSlotCount = 16;
 
     internal static Bounds UsableBounds(Bounds bench, float sideMargin, float topMargin)
     {
@@ -60,7 +65,12 @@ internal static class BenchPacker
     internal static bool SelfCheck()
     {
         Bounds benchBounds = new Bounds(new Vector3(0f, 1f, 0f), new Vector3(1f, 0.1f, 1f));
-        List<Vector2> partSizes = Enumerable.Repeat(new Vector2(0.25f, 0.25f), 20).ToList();
+        List<Vector2> partSizes = new List<Vector2>(SelfCheckPartCount);
+
+        for (int partIndex = 0; partIndex < SelfCheckPartCount; partIndex++)
+        {
+            partSizes.Add(new Vector2(SelfCheckPartExtent, SelfCheckPartExtent));
+        }
 
         var expectedFirstSlots = new Dictionary<BenchAnchorSide, Vector3>
         {
@@ -75,30 +85,21 @@ internal static class BenchPacker
             List<Vector3> packedSlots =
                 PackSlots(partSizes, benchBounds, 1f, 0f, expectation.Key, 1f, 0.5f);
 
-            bool isAnchorValid = packedSlots.Count == 16
-                                 && Vector3.Distance(packedSlots[0], expectation.Value) < 0.001f
-                                 && packedSlots[1].z == packedSlots[0].z
-                                 && Mathf.Abs(Mathf.Abs(packedSlots[1].x - packedSlots[0].x) - 0.25f) < 0.001f
-                                 && Mathf.Abs(packedSlots[4].z - packedSlots[0].z + 0.25f) < 0.001f
-                                 && packedSlots.TrueForAll(slot =>
-                                     Mathf.Abs(slot.x) <= 0.5f && Mathf.Abs(slot.z) <= 0.5f);
+            if (IsAnchorLayoutValid(packedSlots, expectation.Value))
+                continue;
 
-            if (!isAnchorValid)
-            {
-                string firstSlotText = packedSlots.Count > 0 ? packedSlots[0].ToString() : "none";
+            string firstSlotText = packedSlots.Count > 0 ? packedSlots[0].ToString() : "none";
 
-                Log.Error($"Self-check FAILED for {expectation.Key}: {packedSlots.Count} cells, " +
-                          $"first {firstSlotText}, expected {expectation.Value}.");
-                isValid = false;
-            }
+            Log.Error($"Self-check FAILED for {expectation.Key}: {packedSlots.Count} cells, " +
+                      $"first {firstSlotText}, expected {expectation.Value}.");
+
+            isValid = false;
         }
 
         List<Vector3> narrowRowSlots =
             PackSlots(partSizes, benchBounds, 1f, 0f, BenchAnchorSide.Left, 0.5f, 0.5f);
 
-        if (narrowRowSlots.Count < 3
-            || narrowRowSlots[2].x != narrowRowSlots[0].x
-            || Mathf.Abs(narrowRowSlots[2].z - narrowRowSlots[0].z + 0.25f) > 0.001f)
+        if (!HasWrappedOntoANewRow(narrowRowSlots))
         {
             Log.Error("Self-check FAILED: row width limit did not wrap the third part onto a new row.");
             isValid = false;
@@ -106,10 +107,7 @@ internal static class BenchPacker
 
         Bounds insetBounds = UsableBounds(benchBounds, 0.1f, 0.2f);
 
-        if (Mathf.Abs(insetBounds.min.x + 0.4f) > 0.001f
-            || Mathf.Abs(insetBounds.max.x - 0.4f) > 0.001f
-            || Mathf.Abs(insetBounds.max.z - 0.3f) > 0.001f
-            || Mathf.Abs(insetBounds.min.z + 0.5f) > 0.001f)
+        if (!AreMarginsApplied(insetBounds))
         {
             Log.Error($"Self-check FAILED: margins gave min {insetBounds.min} max {insetBounds.max}.");
             isValid = false;
@@ -124,7 +122,7 @@ internal static class BenchPacker
         }
 
         List<Vector3> oversizedPartSlots = PackSlots(
-            new[] { new Vector2(2f, 0.25f) }, benchBounds, 1f, 0f, BenchAnchorSide.Left, 1f, 0.5f);
+            new[] { new Vector2(2f, SelfCheckPartExtent) }, benchBounds, 1f, 0f, BenchAnchorSide.Left, 1f, 0.5f);
 
         if (oversizedPartSlots.Count != 0)
         {
@@ -134,14 +132,85 @@ internal static class BenchPacker
 
         Vector3 diagonalSize = RotatedSize(Quaternion.Euler(0f, 45f, 0f), Vector3.one);
 
-        if (Mathf.Abs(diagonalSize.x - Mathf.Sqrt(2f)) > 0.001f
-            || Mathf.Abs(diagonalSize.z - Mathf.Sqrt(2f)) > 0.001f)
+        if (!IsDiagonalSizeCorrect(diagonalSize))
         {
             Log.Error($"Self-check FAILED: a part rotated 45 degrees measured {diagonalSize}.");
             isValid = false;
         }
 
         return isValid;
+    }
+
+    private static bool IsAnchorLayoutValid(List<Vector3> packedSlots, Vector3 expectedFirstSlot)
+    {
+        bool hasFilledTheBench = packedSlots.Count == SelfCheckExpectedSlotCount;
+
+        if (!hasFilledTheBench)
+            return false;
+
+        bool isFirstSlotWhereExpected =
+            Vector3.Distance(packedSlots[0], expectedFirstSlot) < SelfCheckTolerance;
+
+        bool isSecondSlotOnTheSameRow = packedSlots[1].z == packedSlots[0].z;
+
+        bool isSecondSlotOnePartAcross =
+            Mathf.Abs(Mathf.Abs(packedSlots[1].x - packedSlots[0].x) - SelfCheckPartExtent) < SelfCheckTolerance;
+
+        bool isFifthSlotOneRowDown =
+            Mathf.Abs(packedSlots[4].z - packedSlots[0].z + SelfCheckPartExtent) < SelfCheckTolerance;
+
+        if (!isFirstSlotWhereExpected || !isSecondSlotOnTheSameRow)
+            return false;
+
+        if (!isSecondSlotOnePartAcross || !isFifthSlotOneRowDown)
+            return false;
+
+        return AreAllSlotsOnTheBench(packedSlots);
+    }
+
+    private static bool AreAllSlotsOnTheBench(List<Vector3> packedSlots)
+    {
+        foreach (Vector3 slot in packedSlots)
+        {
+            bool isWithinBench = Mathf.Abs(slot.x) <= SelfCheckBenchHalfExtent
+                                 && Mathf.Abs(slot.z) <= SelfCheckBenchHalfExtent;
+
+            if (!isWithinBench)
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool HasWrappedOntoANewRow(List<Vector3> narrowRowSlots)
+    {
+        if (narrowRowSlots.Count < 3)
+            return false;
+
+        bool isThirdSlotBackAtRowStart = narrowRowSlots[2].x == narrowRowSlots[0].x;
+        bool isThirdSlotOneRowDown =
+            Mathf.Abs(narrowRowSlots[2].z - narrowRowSlots[0].z + SelfCheckPartExtent) <= SelfCheckTolerance;
+
+        return isThirdSlotBackAtRowStart && isThirdSlotOneRowDown;
+    }
+
+    private static bool AreMarginsApplied(Bounds insetBounds)
+    {
+        bool areSideMarginsApplied = Mathf.Abs(insetBounds.min.x + 0.4f) <= SelfCheckTolerance
+                                     && Mathf.Abs(insetBounds.max.x - 0.4f) <= SelfCheckTolerance;
+
+        bool isTopMarginApplied = Mathf.Abs(insetBounds.max.z - 0.3f) <= SelfCheckTolerance;
+        bool isNearEdgeLeftAlone = Mathf.Abs(insetBounds.min.z + 0.5f) <= SelfCheckTolerance;
+
+        return areSideMarginsApplied && isTopMarginApplied && isNearEdgeLeftAlone;
+    }
+
+    private static bool IsDiagonalSizeCorrect(Vector3 diagonalSize)
+    {
+        bool isWidthCorrect = Mathf.Abs(diagonalSize.x - Mathf.Sqrt(2f)) <= SelfCheckTolerance;
+        bool isDepthCorrect = Mathf.Abs(diagonalSize.z - Mathf.Sqrt(2f)) <= SelfCheckTolerance;
+
+        return isWidthCorrect && isDepthCorrect;
     }
 
     private static List<Vector3> PackSlots(IList<Vector2> sizes, Bounds bounds, float slotY, float gap,

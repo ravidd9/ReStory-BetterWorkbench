@@ -30,7 +30,10 @@ public partial class BetterWorkbenchPlugin : MelonMod
     private static MelonPreferences_Category _hotkeys;
     private static MelonPreferences_Category _layout;
 
-    public override void OnEarlyInitializeMelon() => Log.Source = LoggerInstance;
+    public override void OnEarlyInitializeMelon()
+    {
+        Log.Source = LoggerInstance;
+    }
 
     public override void OnInitializeMelon()
     {
@@ -44,7 +47,10 @@ public partial class BetterWorkbenchPlugin : MelonMod
         }
     }
 
-    public override void OnUpdate() => HandleHotkeys();
+    public override void OnUpdate()
+    {
+        HandleHotkeys();
+    }
 
     private void BindConfig()
     {
@@ -62,8 +68,10 @@ public partial class BetterWorkbenchPlugin : MelonMod
         CellGap = BindRanged(CellGapName, DefaultCellGap, CellGapPurpose, 0f, MaxCellGap);
         SafetyMargin = BindRanged(SafetyMarginName, DefaultSafetyMargin, SafetyMarginPurpose,
             0f, MaxSafetyMargin);
+
         ShelfSlack = BindRanged(ShelfSlackName, DefaultShelfSlack, ShelfSlackPurpose,
             MinShelfSlack, MaxShelfSlack);
+
         ControlsDisplayOffset = BindRanged(ControlsDisplayOffsetName, DefaultControlsDisplayOffset,
             ControlsDisplayOffsetPurpose, 0f, MaxControlsDisplayOffset);
 
@@ -98,8 +106,10 @@ public partial class BetterWorkbenchPlugin : MelonMod
     }
 
     private MelonPreferences_Entry<float> BindRanged(string settingName, float defaultValue, string purpose,
-        float min, float max) =>
-        _layout.CreateEntry(settingName, defaultValue, description: purpose,
+        float min, float max)
+    {
+        return _layout.CreateEntry(settingName, defaultValue, description: purpose,
             validator: new ValueRange<float>(min, max));
+    }
 }
 #endif

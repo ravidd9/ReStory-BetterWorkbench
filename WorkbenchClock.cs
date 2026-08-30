@@ -53,7 +53,9 @@ internal static class WorkbenchClock
         GameCalendar calendar = Object.FindObjectOfType<GameCalendar>();
         ClockDisplay clockSource = FindClockSource();
 
-        if (overlay == null || calendar == null || clockSource == null)
+        bool isMissingSomethingToCloneFrom = overlay == null || calendar == null || clockSource == null;
+
+        if (isMissingSomethingToCloneFrom)
         {
             Log.Warning("Workbench clock: overlay canvas, GameCalendar or clock widget not found; skipping.");
             return;
@@ -211,10 +213,10 @@ internal static class WorkbenchClock
 
         foreach (Image image in Resources.FindObjectsOfTypeAll<Image>())
         {
-            bool isForeignUseOfSprite = image.sprite == sprite
-                                        && (_panel == null || !image.transform.IsChildOf(_panel.transform));
+            bool isSameSprite = image.sprite == sprite;
+            bool isOutsideOurPanel = _panel == null || !image.transform.IsChildOf(_panel.transform);
 
-            if (isForeignUseOfSprite)
+            if (isSameSprite && isOutsideOurPanel)
                 return image.color;
         }
 

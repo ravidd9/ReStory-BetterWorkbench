@@ -42,7 +42,10 @@ public partial class BetterWorkbenchPlugin : BaseUnityPlugin
         }
     }
 
-    private void Update() => HandleHotkeys();
+    private void Update()
+    {
+        HandleHotkeys();
+    }
 
     private void BindConfig()
     {
@@ -55,10 +58,13 @@ public partial class BetterWorkbenchPlugin : BaseUnityPlugin
         Anchor = Config.Bind(LayoutSection, AnchorName, DefaultAnchor, AnchorPurpose);
         CellGap = Config.Bind(LayoutSection, CellGapName, DefaultCellGap, new ConfigDescription(
             CellGapPurpose, new AcceptableValueRange<float>(0f, MaxCellGap)));
+
         SafetyMargin = Config.Bind(LayoutSection, SafetyMarginName, DefaultSafetyMargin, new ConfigDescription(
             SafetyMarginPurpose, new AcceptableValueRange<float>(0f, MaxSafetyMargin)));
+
         ShelfSlack = Config.Bind(LayoutSection, ShelfSlackName, DefaultShelfSlack, new ConfigDescription(
             ShelfSlackPurpose, new AcceptableValueRange<float>(MinShelfSlack, MaxShelfSlack)));
+
         ControlsDisplayOffset = Config.Bind(LayoutSection, ControlsDisplayOffsetName,
             DefaultControlsDisplayOffset, new ConfigDescription(
                 ControlsDisplayOffsetPurpose, new AcceptableValueRange<float>(0f, MaxControlsDisplayOffset)));
@@ -74,10 +80,10 @@ public partial class BetterWorkbenchPlugin : BaseUnityPlugin
 
         for (int lineIndex = 0; lineIndex < lines.Count; lineIndex++)
         {
-            bool isUnseparatedSectionHeader = lines[lineIndex].StartsWith("[")
-                                              && (lineIndex == 0 || lines[lineIndex - 1] != SectionSeparator);
+            bool isSectionHeader = lines[lineIndex].StartsWith("[");
+            bool hasSeparatorAbove = lineIndex > 0 && lines[lineIndex - 1] == SectionSeparator;
 
-            if (!isUnseparatedSectionHeader)
+            if (!isSectionHeader || hasSeparatorAbove)
                 continue;
 
             lines.Insert(lineIndex, SectionSeparator);

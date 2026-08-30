@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using HarmonyLib;
 using Restory.Constants;
 using Restory.Data.Elements;
@@ -40,19 +39,29 @@ internal static class BenchOrganizer
             return;
         }
 
-        List<ElementBase> draggableParts = _surface.PlacedElements
-            .Where(element => element && element.Info != null && element.Info.Category == ElementCategory.Draggable)
-            .ToList();
+        List<ElementBase> parts = new List<ElementBase>();
+        int draggablePartCount = 0;
 
-        List<ElementBase> parts = draggableParts
-            .Where(element => element.PlacementPositionHandler?.PlacementPositionData != null)
-            .OrderByDescending(Footprint)
-            .ThenBy(element => element.Info.ID)
-            .ToList();
-
-        if (parts.Count < draggableParts.Count)
+        foreach (ElementBase element in _surface.PlacedElements)
         {
-            Log.Warning($"Skipping {draggableParts.Count - parts.Count} part(s) with no placement data.");
+            if (!IsDraggablePart(element))
+                continue;
+
+            draggablePartCount++;
+
+            if (element.PlacementPositionHandler?.PlacementPositionData != null)
+            {
+                parts.Add(element);
+            }
+        }
+
+        parts.Sort(CompareByFootprintThenId);
+
+        int partsWithoutPlacementData = draggablePartCount - parts.Count;
+
+        if (partsWithoutPlacementData > 0)
+        {
+            Log.Warning($"Skipping {partsWithoutPlacementData} part(s) with no placement data.");
         }
 
         if (parts.Count == 0)
@@ -70,14 +79,7 @@ internal static class BenchOrganizer
         float slotY = _surface.DefaultPlacementPosition.y;
         ControlsDisplay.PlaceAwayFrom(anchor, bench);
 
-        float compactRowWidth = CompactRowWidth(parts, usable, gap);
-        float fullRowWidth = usable.size.x;
-        float[] candidateWidths = new[]
-        {
-            compactRowWidth,
-            Mathf.Min(compactRowWidth * WidenedRetryFactor, fullRowWidth),
-            fullRowWidth
-        }.Distinct().ToArray();
+        List<float> candidateWidths = CandidateRowWidths(parts, usable, gap);
 
         PassResult result = default;
         float usedRowWidth = 0f;
@@ -133,7 +135,15 @@ internal static class BenchOrganizer
         Log.Debug(
             $"{anchor}: {result.Packed} packed, {result.Unplaced.Count} overflow, {strandedCount} stranded, " +
             $"{screwsReturned} screws re-binned (slack {BetterWorkbenchPlugin.ShelfSlack.Value:F2} -> " +
-            $"row width {usedRowWidth:F2}, pass {passNumber} of {candidateWidths.Length}).");
+            $"row width {usedRowWidth:F2}, pass {passNumber} of {candidateWidths.Count}).");
+    }
+
+    internal static bool IsDraggablePart(ElementBase element)
+    {
+        if (!element || element.Info == null)
+            return false;
+
+        return element.Info.Category == ElementCategory.Draggable;
     }
 
     [HarmonyPostfix]
@@ -147,20 +157,31 @@ internal static class BenchOrganizer
     [HarmonyPostfix]
     [HarmonyPatch(typeof(ElementPlacementController), MethodType.Constructor,
         typeof(GameCursorDetector), typeof(PlacementPositionFinder), typeof(WorkSurface))]
-    private static void CapturePlacement(ElementPlacementController __instance) => _placement = __instance;
+    private static void CapturePlacement(ElementPlacementController __instance)
+    {
+        _placement = __instance;
+    }
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(DisassembleStateMachine), nameof(DisassembleStateMachine.Initialize))]
-    private static void CaptureStateMachine(DisassembleStateMachine __instance) => _stateMachine = __instance;
+    private static void CaptureStateMachine(DisassembleStateMachine __instance)
+    {
+        _stateMachine = __instance;
+    }
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(PlacedElementsHandler), nameof(PlacedElementsHandler.Construct))]
-    private static void CaptureSmallElementBin(SmallElementBin smallElementBin) =>
+    private static void CaptureSmallElementBin(SmallElementBin smallElementBin)
+    {
         _smallElementBin = smallElementBin;
+    }
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(DisassembleGameMode), nameof(DisassembleGameMode.Initialize))]
-    private static void CaptureGameMode(DisassembleGameMode __instance) => _gameMode = __instance;
+    private static void CaptureGameMode(DisassembleGameMode __instance)
+    {
+        _gameMode = __instance;
+    }
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(WorkSurface), nameof(WorkSurface.AddElement))]
@@ -174,23 +195,32 @@ internal static class BenchOrganizer
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(WorkSurface), nameof(WorkSurface.ClearElements))]
-    private static void ResetHighlightsOnBenchCleared() => SurfaceHighlighter.Reset("device finished");
+    private static void ResetHighlightsOnBenchCleared()
+    {
+        SurfaceHighlighter.Reset("device finished");
+    }
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(WorkSurface), nameof(WorkSurface.Dispose))]
-    private static void ResetHighlightsOnWorkplaceClosed() => SurfaceHighlighter.Reset("workplace closed");
+    private static void ResetHighlightsOnWorkplaceClosed()
+    {
+        SurfaceHighlighter.Reset("workplace closed");
+    }
 
     private static int ReturnStrayScrewsToBin()
     {
         if (_smallElementBin == null)
             return 0;
 
-        List<ElementBase> strayScrews = _surface.PlacedElements
-            .Where(element => element
-                              && element.Info != null
-                              && element.Info.Category == ElementCategory.Small
-                              && element.transform.parent != _smallElementBin.transform)
-            .ToList();
+        List<ElementBase> strayScrews = new List<ElementBase>();
+
+        foreach (ElementBase element in _surface.PlacedElements)
+        {
+            if (!IsStrayScrew(element))
+                continue;
+
+            strayScrews.Add(element);
+        }
 
         foreach (ElementBase screw in strayScrews)
         {
@@ -198,6 +228,52 @@ internal static class BenchOrganizer
         }
 
         return strayScrews.Count;
+    }
+
+    private static bool IsStrayScrew(ElementBase element)
+    {
+        if (!element || element.Info == null)
+            return false;
+
+        bool isSmallElement = element.Info.Category == ElementCategory.Small;
+        bool isOutsideBin = element.transform.parent != _smallElementBin.transform;
+
+        return isSmallElement && isOutsideBin;
+    }
+
+    private static int CompareByFootprintThenId(ElementBase left, ElementBase right)
+    {
+        int byLargestFootprint = Footprint(right).CompareTo(Footprint(left));
+
+        if (byLargestFootprint != 0)
+            return byLargestFootprint;
+
+        int byPartId = left.Info.ID.CompareTo(right.Info.ID);
+
+        if (byPartId != 0)
+            return byPartId;
+
+        return left.GetInstanceID().CompareTo(right.GetInstanceID());
+    }
+
+    private static List<float> CandidateRowWidths(List<ElementBase> parts, Bounds usable, float gap)
+    {
+        float compactRowWidth = CompactRowWidth(parts, usable, gap);
+        float fullRowWidth = usable.size.x;
+        float widenedRowWidth = Mathf.Min(compactRowWidth * WidenedRetryFactor, fullRowWidth);
+
+        float[] rowWidthsToTry = { compactRowWidth, widenedRowWidth, fullRowWidth };
+        List<float> candidateWidths = new List<float>();
+
+        foreach (float rowWidth in rowWidthsToTry)
+        {
+            if (candidateWidths.Contains(rowWidth))
+                continue;
+
+            candidateWidths.Add(rowWidth);
+        }
+
+        return candidateWidths;
     }
 
     private static PassResult PlacePass(List<ElementBase> parts, Bounds usable, float slotY, float gap,
@@ -248,8 +324,10 @@ internal static class BenchOrganizer
         Vector3 halfExtents = placementData.BoxColliderSize * 0.5f
                               + Vector3.one * BetterWorkbenchPlugin.SafetyMargin.Value;
 
-        return Physics.BoxCastNonAlloc(castCentre, halfExtents, placementData.PlacementDirection,
-            CastHits, placementData.PlacementRotation, SlotCastDistance, BlockingLayers) == 0;
+        int blockerCount = Physics.BoxCastNonAlloc(castCentre, halfExtents, placementData.PlacementDirection,
+            CastHits, placementData.PlacementRotation, SlotCastDistance, BlockingLayers);
+
+        return blockerCount == 0;
     }
 
     private static void PlaceAt(ElementBase part, Vector3 slot)

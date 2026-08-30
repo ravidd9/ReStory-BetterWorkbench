@@ -77,6 +77,11 @@ internal static class Strings
         Days = Translate(DaysByLanguage, language);
     }
 
-    private static string Translate(Dictionary<SystemLanguage, string> byLanguage, SystemLanguage language) =>
-        byLanguage.TryGetValue(language, out string translated) ? translated : byLanguage[SystemLanguage.English];
+    private static string Translate(Dictionary<SystemLanguage, string> byLanguage, SystemLanguage language)
+    {
+        if (byLanguage.TryGetValue(language, out string translated))
+            return translated;
+
+        return byLanguage[SystemLanguage.English];
+    }
 }

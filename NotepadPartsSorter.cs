@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using HarmonyLib;
 using Restory.Data.Elements.Condition;
 using Restory.Gameplay.Elements;
@@ -44,9 +43,16 @@ internal static class NotepadPartsSorter
 
     private static bool Prepare()
     {
-        if (AccessTools.Method(typeof(GUI_NotepadElementsPanel), "UpdateElements") != null
-            && AccessTools.Field(typeof(GUI_NotepadElementsPanel), "cachedPlacedElements") != null)
+        bool hasUpdateElementsMethod =
+            AccessTools.Method(typeof(GUI_NotepadElementsPanel), "UpdateElements") != null;
+
+        bool hasCachedElementsField =
+            AccessTools.Field(typeof(GUI_NotepadElementsPanel), "cachedPlacedElements") != null;
+
+        if (hasUpdateElementsMethod && hasCachedElementsField)
+        {
             return true;
+        }
 
         Log.Error("Notepad parts sorting is disabled: GUI_NotepadElementsPanel.UpdateElements or "
             + "cachedPlacedElements is missing, most likely renamed by a game update. "
@@ -59,12 +65,21 @@ internal static class NotepadPartsSorter
     [HarmonyPatch(typeof(GUI_NotepadElementsPanel), "UpdateElements")]
     private static void SortByRemainingWork(List<ElementBase> ___cachedPlacedElements)
     {
-        List<ElementBase> sorted = ___cachedPlacedElements
-            .OrderBy(part => WorkRank(part.ConditionHandler.ElementData))
-            .ToList();
+        List<ElementBase> sortedByWorkRank = new List<ElementBase>(___cachedPlacedElements.Count);
+
+        for (int rank = BrokenRank; rank <= ReadyRank; rank++)
+        {
+            foreach (ElementBase part in ___cachedPlacedElements)
+            {
+                if (WorkRank(part.ConditionHandler.ElementData) != rank)
+                    continue;
+
+                sortedByWorkRank.Add(part);
+            }
+        }
 
         ___cachedPlacedElements.Clear();
-        ___cachedPlacedElements.AddRange(sorted);
+        ___cachedPlacedElements.AddRange(sortedByWorkRank);
     }
 
     private static int WorkRank(ElementData elementData)
@@ -97,15 +112,19 @@ internal static class NotepadPartsSorter
         return false;
     }
 
-    private static ElementConditionBase Condition<T>() where T : ElementConditionBase =>
-        ScriptableObject.CreateInstance<T>();
+    private static ElementConditionBase Condition<T>() where T : ElementConditionBase
+    {
+        return ScriptableObject.CreateInstance<T>();
+    }
 
-    private static ScorchedCircuitProperty ScorchedCircuit(SolderPointState state) =>
-        new ScorchedCircuitProperty
+    private static ScorchedCircuitProperty ScorchedCircuit(SolderPointState state)
+    {
+        return new ScorchedCircuitProperty
         {
             BurntTraces = new List<BurntTraceData>
             {
                 new BurntTraceData { SolderPoints = { new SolderPointData { State = state } } }
             }
         };
+    }
 }

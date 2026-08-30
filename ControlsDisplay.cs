@@ -1,5 +1,4 @@
 using HarmonyLib;
-using Restory.Data.Elements;
 using Restory.Gameplay.Elements;
 using Restory.Gameplay.GameSettings.Observers;
 using Restory.Gameplay.Workplace;
@@ -103,8 +102,9 @@ internal static class ControlsDisplay
         _isShown = isActive;
 
         bool isHiddenToShownEdge = isActive && !wasShown;
+        bool hasNothingToPosition = _display == null || _surface == null;
 
-        if (!isHiddenToShownEdge || _display == null || _surface == null)
+        if (!isHiddenToShownEdge || hasNothingToPosition)
             return;
 
         Bounds bench = BenchPacker.WorldBounds(_surface.SurfaceBoundary);
@@ -113,7 +113,7 @@ internal static class ControlsDisplay
 
         foreach (ElementBase element in _surface.PlacedElements)
         {
-            if (!element || element.Info == null || element.Info.Category != ElementCategory.Draggable)
+            if (!BenchOrganizer.IsDraggablePart(element))
                 continue;
 
             if (element.transform.position.x < bench.center.x)
@@ -153,25 +153,18 @@ internal static class ControlsDisplay
 
     private static void RefreshRows()
     {
-        if (_organizeLabel != null)
-        {
-            _organizeLabel.text = $"- {Strings.Organize}";
-        }
+        SetText(_organizeLabel, $"- {Strings.Organize}");
+        SetText(_organizeKeyLabel, BetterWorkbenchPlugin.OrganizeKey.ToString());
+        SetText(_highlightsLabel, $"- {Strings.Highlights}");
+        SetText(_highlightsKeyLabel, BetterWorkbenchPlugin.HighlightsKey.ToString());
+    }
 
-        if (_organizeKeyLabel != null)
-        {
-            _organizeKeyLabel.text = BetterWorkbenchPlugin.OrganizeKey.ToString();
-        }
+    private static void SetText(TMP_Text label, string text)
+    {
+        if (label == null)
+            return;
 
-        if (_highlightsLabel != null)
-        {
-            _highlightsLabel.text = $"- {Strings.Highlights}";
-        }
-
-        if (_highlightsKeyLabel != null)
-        {
-            _highlightsKeyLabel.text = BetterWorkbenchPlugin.HighlightsKey.ToString();
-        }
+        label.text = text;
     }
 
     private static bool TryCloneRow(GameObject template, Transform rows, string rowName,

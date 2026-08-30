@@ -27,15 +27,21 @@ internal static class NotepadSectionCollapse
 
     private static bool Prepare()
     {
-        bool hasEveryField = AccessTools.Field(typeof(GUI_NotepadElementsPanelView), "installedElementsContainer") != null
-                             && AccessTools.Field(typeof(GUI_NotepadElementsPanelView), "onSurfaceElementsContainer") != null
-                             && AccessTools.Field(typeof(GUI_NotepadElementsPanelView), "installedElementsCount") != null
-                             && AccessTools.Field(typeof(GUI_NotepadElementsPanelView), "onSurfaceElementsCount") != null
-                             && AccessTools.Method(typeof(GUI_NotepadElementsPanelView),
-                                 nameof(GUI_NotepadElementsPanelView.SetElements)) != null;
+        bool hasEveryContainerField =
+            AccessTools.Field(typeof(GUI_NotepadElementsPanelView), "installedElementsContainer") != null
+            && AccessTools.Field(typeof(GUI_NotepadElementsPanelView), "onSurfaceElementsContainer") != null;
 
-        if (hasEveryField)
+        bool hasEveryCountField =
+            AccessTools.Field(typeof(GUI_NotepadElementsPanelView), "installedElementsCount") != null
+            && AccessTools.Field(typeof(GUI_NotepadElementsPanelView), "onSurfaceElementsCount") != null;
+
+        bool hasSetElementsMethod = AccessTools.Method(typeof(GUI_NotepadElementsPanelView),
+            nameof(GUI_NotepadElementsPanelView.SetElements)) != null;
+
+        if (hasEveryContainerField && hasEveryCountField && hasSetElementsMethod)
+        {
             return true;
+        }
 
         Log.Warning("Notepad section collapsing is disabled: GUI_NotepadElementsPanelView is missing a "
                     + "container or count field, most likely renamed by a game update. "
@@ -64,6 +70,7 @@ internal static class NotepadSectionCollapse
 
         Bind(InstalledPartsSection, ReadField<RectTransform>(__instance, "installedElementsContainer"),
             ReadField<TMP_Text>(__instance, "installedElementsCount"));
+
         Bind(SurfacePartsSection, ReadField<RectTransform>(__instance, "onSurfaceElementsContainer"),
             ReadField<TMP_Text>(__instance, "onSurfaceElementsCount"));
     }
@@ -122,8 +129,11 @@ internal static class NotepadSectionCollapse
     {
         foreach (char glyph in glyphsByPreference)
         {
-            if (label.font == null
-                || label.font.HasCharacter(glyph, searchFallbacks: true, tryAddCharacter: true))
+            bool isGlyphAvailable = label.font == null
+                                    || label.font.HasCharacter(glyph, searchFallbacks: true,
+                                        tryAddCharacter: true);
+
+            if (isGlyphAvailable)
                 return glyph.ToString();
         }
 

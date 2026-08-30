@@ -17,14 +17,6 @@ internal static class UpdateCheck
 
     private const int RequestTimeoutSeconds = 10;
 
-#pragma warning disable CS0649
-    [Serializable]
-    private class LatestRelease
-    {
-        public string tag_name;
-    }
-#pragma warning restore CS0649
-
     internal static IEnumerator Run(string currentVersion)
     {
         using UnityWebRequest request = UnityWebRequest.Get(GitHubLatestReleaseApi);
@@ -75,7 +67,10 @@ internal static class UpdateCheck
         return isValid;
     }
 
-    private static string Release(string tag) => $"{{\"tag_name\":\"{tag}\"}}";
+    private static string Release(string tag)
+    {
+        return $"{{\"tag_name\":\"{tag}\"}}";
+    }
 
     private static bool Expect(string caseName, string releaseJson, bool isExpectedNewer)
     {
@@ -104,7 +99,19 @@ internal static class UpdateCheck
             return false;
         }
 
-        return Version.TryParse(latestReleaseTag?.TrimStart('v', 'V'), out latestVersion)
-               && latestVersion > new Version(currentVersion);
+        bool isReadableVersion = Version.TryParse(latestReleaseTag?.TrimStart('v', 'V'), out latestVersion);
+
+        if (!isReadableVersion)
+            return false;
+
+        return latestVersion > new Version(currentVersion);
     }
+
+#pragma warning disable CS0649
+    [Serializable]
+    private class LatestRelease
+    {
+        public string tag_name;
+    }
+#pragma warning restore CS0649
 }

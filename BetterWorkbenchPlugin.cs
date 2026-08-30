@@ -23,18 +23,26 @@ public partial class BetterWorkbenchPlugin
 
     internal const string OrganizeKeyPurpose =
         "Packs the loose parts on the bench. Hold Shift to pack against the opposite side.";
+
     internal const string HighlightsKeyPurpose =
         "Toggles the outline highlight on every part lying on the bench.";
+
     internal const string AnchorPurpose = "Bench side the parts are packed against.";
     internal const string CellGapPurpose = "Gap between packed parts, in meters.";
+
     internal const string SafetyMarginPurpose =
         "Extra collision padding safety around each part spot, in meters.";
+
     internal const string ShelfSlackPurpose = "How loosely the packed block spreads over the bench.";
+
     internal const string ControlsDisplayOffsetPurpose =
         "How far the controls UI display position is adjusted when switching sides.";
+
     internal const string TopMarginPurpose = "Margin kept clear along the top edge of the bench.";
+
     internal const string SideMarginPurpose =
         "Margin kept clear along both the left and right edges of the bench.";
+
     internal const string UpdateCheckPurpose =
         "Looks up the latest release on github.com once at startup and logs a line when yours is older. "
         + "Sends nothing about you. Set to false to keep the mod entirely offline.";
@@ -60,15 +68,25 @@ public partial class BetterWorkbenchPlugin
     internal static KeyCode OrganizeKey;
     internal static KeyCode HighlightsKey;
 
-    internal static float TopMarginFor(BenchAnchorSide anchor) => _topMarginsPerAnchor[(int)anchor].Value;
+    internal static float TopMarginFor(BenchAnchorSide anchor)
+    {
+        return _topMarginsPerAnchor[(int)anchor].Value;
+    }
 
-    internal static float SideMarginFor(BenchAnchorSide anchor) => _sideMarginsPerAnchor[(int)anchor].Value;
+    internal static float SideMarginFor(BenchAnchorSide anchor)
+    {
+        return _sideMarginsPerAnchor[(int)anchor].Value;
+    }
 
-    internal static string HotkeyDescription(string purpose) =>
-        $"{purpose} Takes any Unity KeyCode name, e.g. F, G, R, Tab, F6, Keypad5.";
+    internal static string HotkeyDescription(string purpose)
+    {
+        return $"{purpose} Takes any Unity KeyCode name, e.g. F, G, R, Tab, F6, Keypad5.";
+    }
 
-    internal static string MarginDescription(string purpose, BenchAnchorSide anchor) =>
-        $"{purpose} Applies when packing against the {anchor} side.";
+    internal static string MarginDescription(string purpose, BenchAnchorSide anchor)
+    {
+        return $"{purpose} Applies when packing against the {anchor} side.";
+    }
 
     private static void RunSelfChecks()
     {
@@ -99,15 +117,24 @@ public partial class BetterWorkbenchPlugin
         }
     }
 
-    private static BenchAnchorSide Opposite(BenchAnchorSide anchor) =>
-        anchor == BenchAnchorSide.Left ? BenchAnchorSide.Right : BenchAnchorSide.Left;
+    private static BenchAnchorSide Opposite(BenchAnchorSide anchor)
+    {
+        if (anchor == BenchAnchorSide.Left)
+            return BenchAnchorSide.Right;
+
+        return BenchAnchorSide.Left;
+    }
 
     private static KeyCode ParseHotkey(string settingName, string configuredKey, KeyCode defaultKey)
     {
-        if (Enum.TryParse(configuredKey, true, out KeyCode key) && Enum.IsDefined(typeof(KeyCode), key))
+        bool isKnownKeyName = Enum.TryParse(configuredKey, true, out KeyCode key)
+                              && Enum.IsDefined(typeof(KeyCode), key);
+
+        if (isKnownKeyName)
             return key;
 
         Log.Warning($"{settingName} \"{configuredKey}\" is not a key name; falling back to {defaultKey}.");
+
         return defaultKey;
     }
 }
