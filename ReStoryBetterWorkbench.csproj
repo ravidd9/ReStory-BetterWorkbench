@@ -57,6 +57,12 @@
     <Reference Include="$(PkgHarmonyX)\lib\net35\0Harmony.dll" Private="false" />
   </ItemGroup>
 
+  <!-- The key frame drawn behind hotkey names in the bench controls display. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\KeyFrame.png"
+                      LogicalName="ReStoryBetterWorkbench.Assets.KeyFrame.png" />
+  </ItemGroup>
+
   <ItemGroup>
     <Reference Include="$(Managed)\mscorlib.dll" Private="false" />
     <Reference Include="$(Managed)\netstandard.dll" Private="false" />
