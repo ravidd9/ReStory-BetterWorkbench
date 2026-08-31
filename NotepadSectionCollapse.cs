@@ -99,7 +99,7 @@ internal static class NotepadSectionCollapse
         arrowObject.name = ArrowName;
         arrowObject.transform.SetAsFirstSibling();
 
-        ControlsDisplay.DisableInheritedLocalization(arrowObject);
+        UiClones.DisableInheritedLocalization(arrowObject);
 
         TMP_Text arrow = arrowObject.GetComponent<TMP_Text>();
         arrow.raycastTarget = false;
