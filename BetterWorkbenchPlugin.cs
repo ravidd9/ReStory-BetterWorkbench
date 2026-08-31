@@ -17,6 +17,7 @@ public partial class BetterWorkbenchPlugin
     internal const string SafetyMarginName = "SafetyMargin";
     internal const string ShelfSlackName = "ShelfSlack";
     internal const string ControlsDisplayOffsetName = "ControlsDisplayOffset";
+    internal const string ClockBackgroundOpacityName = "ClockBackgroundOpacity";
     internal const string TopMarginName = "TopMargin";
     internal const string SideMarginName = "SideMargin";
     internal const string UpdateCheckName = "UpdateCheck";
@@ -37,6 +38,9 @@ public partial class BetterWorkbenchPlugin
 
     internal const string ControlsDisplayOffsetPurpose =
         "How far the controls UI display position is adjusted when switching sides.";
+
+    internal const string ClockBackgroundOpacityPurpose =
+        "How solid the workbench clock background panel is. 0 hides it, 1 makes it fully opaque.";
 
     internal const string TopMarginPurpose = "Margin kept clear along the top edge of the bench.";
 
@@ -59,6 +63,8 @@ public partial class BetterWorkbenchPlugin
     internal const float MaxShelfSlack = 2.5f;
     internal const float DefaultControlsDisplayOffset = 0.07f;
     internal const float MaxControlsDisplayOffset = 0.4f;
+    internal const float DefaultClockBackgroundOpacity = 0.75f;
+    internal const float MaxClockBackgroundOpacity = 1f;
     internal const float MaxMargin = 0.4f;
     internal const bool DefaultUpdateCheck = true;
 

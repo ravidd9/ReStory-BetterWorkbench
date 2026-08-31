@@ -21,6 +21,7 @@ public partial class BetterWorkbenchPlugin : BaseUnityPlugin
     internal static ConfigEntry<float> SafetyMargin;
     internal static ConfigEntry<float> ShelfSlack;
     internal static ConfigEntry<float> ControlsDisplayOffset;
+    internal static ConfigEntry<float> ClockBackgroundOpacity;
     internal static ConfigEntry<bool> UpdateCheckEnabled;
 
     private static ConfigEntry<float>[] _topMarginsPerAnchor;
@@ -68,6 +69,10 @@ public partial class BetterWorkbenchPlugin : BaseUnityPlugin
         ControlsDisplayOffset = Config.Bind(LayoutSection, ControlsDisplayOffsetName,
             DefaultControlsDisplayOffset, new ConfigDescription(
                 ControlsDisplayOffsetPurpose, new AcceptableValueRange<float>(0f, MaxControlsDisplayOffset)));
+
+        ClockBackgroundOpacity = Config.Bind(LayoutSection, ClockBackgroundOpacityName,
+            DefaultClockBackgroundOpacity, new ConfigDescription(ClockBackgroundOpacityPurpose,
+                new AcceptableValueRange<float>(0f, MaxClockBackgroundOpacity)));
 
         _topMarginsPerAnchor = BindMarginPerAnchor(TopMarginName, DefaultTopMargins, TopMarginPurpose);
         _sideMarginsPerAnchor = BindMarginPerAnchor(SideMarginName, DefaultSideMargins, SideMarginPurpose);

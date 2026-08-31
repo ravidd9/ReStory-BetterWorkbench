@@ -21,6 +21,7 @@ public partial class BetterWorkbenchPlugin : MelonMod
     internal static MelonPreferences_Entry<float> SafetyMargin;
     internal static MelonPreferences_Entry<float> ShelfSlack;
     internal static MelonPreferences_Entry<float> ControlsDisplayOffset;
+    internal static MelonPreferences_Entry<float> ClockBackgroundOpacity;
     internal static MelonPreferences_Entry<bool> UpdateCheckEnabled;
 
     private static MelonPreferences_Entry<float>[] _topMarginsPerAnchor;
@@ -74,6 +75,9 @@ public partial class BetterWorkbenchPlugin : MelonMod
 
         ControlsDisplayOffset = BindRanged(ControlsDisplayOffsetName, DefaultControlsDisplayOffset,
             ControlsDisplayOffsetPurpose, 0f, MaxControlsDisplayOffset);
+
+        ClockBackgroundOpacity = BindRanged(ClockBackgroundOpacityName, DefaultClockBackgroundOpacity,
+            ClockBackgroundOpacityPurpose, 0f, MaxClockBackgroundOpacity);
 
         _topMarginsPerAnchor = BindMarginPerAnchor(TopMarginName, DefaultTopMargins, TopMarginPurpose);
         _sideMarginsPerAnchor = BindMarginPerAnchor(SideMarginName, DefaultSideMargins, SideMarginPurpose);
