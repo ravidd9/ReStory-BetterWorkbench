@@ -2,7 +2,7 @@ using HarmonyLib;
 using Restory.Gameplay.Elements;
 using Restory.Gameplay.GameSettings.Observers;
 using Restory.Gameplay.Workplace;
-using Restory.UserInterface;
+using Restory.UserInterface.CommonElements;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,7 +12,21 @@ namespace ReStoryBetterWorkbench;
 [HarmonyPatch]
 internal static class ControlsDisplay
 {
-    private const float MinKeyLabelFontSize = 4f;
+    private const float MinKeyWidth = 20f;
+    private const float KeyHeight = 20f;
+
+    private const float KeyFaceSideInset = 4.5f;
+    private const float KeyFaceTopInset = 1f;
+    private const float KeyFaceBottomInset = 5.75f;
+
+    private const float KeyFontScale = 0.9f;
+    private const float KeyFontSizeTrim = 1f;
+
+    private const float KeyFrameOpacityOnLeft = 0.5f;
+    private const float KeyFrameOpacityOnRight = 0.4f;
+
+    private static readonly Color KeyFrameTint = Color.white;
+    private static readonly Color KeyLabelColor = new(1f, 1f, 0.9f, 1f);
 
     private static TMP_Text _organizeLabel;
     private static TMP_Text _organizeKeyLabel;
@@ -22,6 +36,7 @@ internal static class ControlsDisplay
     private static Vector3 _displayHome;
     private static bool _isShown;
     private static WorkSurface _surface;
+    private static float _keyFrameOpacity = KeyFrameOpacityOnLeft;
 
     internal static void AddRows(WorkSurface workSurface)
     {
@@ -53,8 +68,10 @@ internal static class ControlsDisplay
 
         GameObject gameRowTemplate = rows.GetChild(rows.childCount - 1).gameObject;
 
-        if (!TryCloneRow(gameRowTemplate, rows, OrganizeRowName,
-                out _organizeLabel, out _organizeKeyLabel))
+        bool hasAddedOrganizeRow = TryCloneRow(gameRowTemplate, rows, OrganizeRowName,
+            out _organizeLabel, out _organizeKeyLabel);
+
+        if (!hasAddedOrganizeRow)
             return;
 
         TryCloneRow(gameRowTemplate, rows, HighlightsRowName,
@@ -72,6 +89,8 @@ internal static class ControlsDisplay
         bool isDisplayOnLeft = _displayHome.x < bench.center.x;
         bool shouldDisplayBeOnLeft = partsSide == BenchAnchorSide.Right;
 
+        ApplyKeyFrameOpacity(shouldDisplayBeOnLeft);
+
         if (isDisplayOnLeft == shouldDisplayBeOnLeft)
         {
             _display.transform.position = _displayHome;
@@ -84,14 +103,6 @@ internal static class ControlsDisplay
 
         _display.transform.position =
             new Vector3(mirroredX + outwardOffset, _displayHome.y, _displayHome.z);
-    }
-
-    internal static void DisableInheritedLocalization(GameObject clone)
-    {
-        foreach (GUI_LocalisedText localizedText in clone.GetComponentsInChildren<GUI_LocalisedText>(true))
-        {
-            localizedText.IsEnabled = false;
-        }
     }
 
     [HarmonyPostfix]
@@ -129,6 +140,7 @@ internal static class ControlsDisplay
         if (partsOnLeft == partsOnRight)
         {
             _display.transform.position = _displayHome;
+            ApplyKeyFrameOpacity(_displayHome.x < bench.center.x);
         }
         else
         {
@@ -153,10 +165,38 @@ internal static class ControlsDisplay
 
     private static void RefreshRows()
     {
-        SetText(_organizeLabel, $"- {Strings.Organize}");
-        SetText(_organizeKeyLabel, BetterWorkbenchPlugin.OrganizeKey.ToString());
-        SetText(_highlightsLabel, $"- {Strings.Highlights}");
-        SetText(_highlightsKeyLabel, BetterWorkbenchPlugin.HighlightsKey.ToString());
+        SetText(_organizeLabel, Strings.Organize);
+        SetKeyText(_organizeKeyLabel, BetterWorkbenchPlugin.OrganizeKey.ToString());
+        SetText(_highlightsLabel, Strings.Highlights);
+        SetKeyText(_highlightsKeyLabel, BetterWorkbenchPlugin.HighlightsKey.ToString());
+    }
+
+    private static void SetKeyText(TMP_Text keyLabel, string keyName)
+    {
+        if (keyLabel == null)
+            return;
+
+        keyLabel.text = keyName;
+        ResizeKeyToFit(keyLabel, keyName);
+    }
+
+    private static void ResizeKeyToFit(TMP_Text keyLabel, string keyName)
+    {
+        float keyWidth = Mathf.Max(MinKeyWidth,
+            keyLabel.GetPreferredValues(keyName).x + KeyFaceSideInset * 2f);
+
+        if (keyLabel.transform.parent is RectTransform slotRect)
+        {
+            slotRect.sizeDelta = new Vector2(keyWidth, KeyHeight);
+        }
+
+        LayoutElement slotSize = keyLabel.transform.parent.GetComponent<LayoutElement>();
+
+        if (slotSize == null)
+            return;
+
+        slotSize.preferredWidth = keyWidth;
+        slotSize.preferredHeight = KeyHeight;
     }
 
     private static void SetText(TMP_Text label, string text)
@@ -177,10 +217,10 @@ internal static class ControlsDisplay
         row.name = rowName;
         row.transform.SetAsLastSibling();
 
-        DisableInheritedLocalization(row);
+        UiClones.DisableInheritedLocalization(row);
 
         TMP_Text rowLabel = row.GetComponentInChildren<TMP_Text>(true);
-        Image icon = row.GetComponentInChildren<Image>(true);
+        Image icon = TakeOverKeyboardIcon(row);
 
         if (rowLabel == null || icon == null)
         {
@@ -189,11 +229,106 @@ internal static class ControlsDisplay
             return false;
         }
 
-        icon.enabled = false;
+        DressIconAsKey(icon);
 
         label = rowLabel;
         keyLabel = PutKeyNameInIconSlot(icon.transform, rowLabel);
         return true;
+    }
+
+    private static void ApplyKeyFrameOpacity(bool isDisplayOnLeft)
+    {
+        _keyFrameOpacity = isDisplayOnLeft ? KeyFrameOpacityOnLeft : KeyFrameOpacityOnRight;
+
+        FadeKeyFrame(_organizeKeyLabel);
+        FadeKeyFrame(_highlightsKeyLabel);
+    }
+
+    private static void FadeKeyFrame(TMP_Text keyLabel)
+    {
+        if (keyLabel == null)
+            return;
+
+        Image icon = keyLabel.transform.parent.GetComponent<Image>();
+
+        if (icon == null)
+            return;
+
+        Color frameTint = icon.color;
+        frameTint.a = _keyFrameOpacity;
+        icon.color = frameTint;
+    }
+
+    private static void DressIconAsKey(Image icon)
+    {
+        Sprite frame = KeyFrameArt.Frame();
+
+        if (frame == null)
+        {
+            icon.enabled = false;
+            return;
+        }
+
+        Color frameTint = KeyFrameTint;
+        frameTint.a = _keyFrameOpacity;
+
+        icon.overrideSprite = null;
+        icon.sprite = frame;
+        icon.type = Image.Type.Sliced;
+        icon.color = frameTint;
+        icon.enabled = true;
+    }
+
+    private static Image TakeOverKeyboardIcon(GameObject row)
+    {
+        GUI_ControlsTypeGameObjectsSwitcher switcher =
+            row.GetComponentInChildren<GUI_ControlsTypeGameObjectsSwitcher>(true);
+
+        if (switcher == null)
+        {
+            Log.Warning("Controls row has no controls type switcher; falling back to the shown icon.");
+            return ShownIcon(row);
+        }
+
+        GameObject keyboardIcon = ReadTarget(switcher, "targetKeyboardAndMouse");
+        GameObject joystickIcon = ReadTarget(switcher, "targetJoystick");
+        GameObject fallbackIcon = ReadTarget(switcher, "targetNone");
+
+        Object.Destroy(switcher);
+
+        if (keyboardIcon == null)
+            return ShownIcon(row);
+
+        HideUnlessKept(joystickIcon, keyboardIcon);
+        HideUnlessKept(fallbackIcon, keyboardIcon);
+
+        keyboardIcon.SetActive(true);
+        return keyboardIcon.GetComponentInChildren<Image>(true);
+    }
+
+    private static GameObject ReadTarget(GUI_ControlsTypeGameObjectsSwitcher switcher, string fieldName)
+    {
+        return AccessTools.Field(typeof(GUI_ControlsTypeGameObjectsSwitcher), fieldName)
+            ?.GetValue(switcher) as GameObject;
+    }
+
+    private static void HideUnlessKept(GameObject icon, GameObject keptIcon)
+    {
+        if (icon == null || icon == keptIcon)
+            return;
+
+        icon.SetActive(false);
+    }
+
+    private static Image ShownIcon(GameObject row)
+    {
+        foreach (Image icon in row.GetComponentsInChildren<Image>(true))
+        {
+            if (icon.gameObject.activeSelf)
+                return icon;
+        }
+
+        return null;
     }
 
     private static TMP_Text PutKeyNameInIconSlot(Transform iconSlot, TMP_Text rowLabel)
@@ -204,16 +339,20 @@ internal static class ControlsDisplay
         RectTransform keyRect = keyLabelObject.GetComponent<RectTransform>();
         keyRect.anchorMin = Vector2.zero;
         keyRect.anchorMax = Vector2.one;
-        keyRect.offsetMin = Vector2.zero;
-        keyRect.offsetMax = Vector2.zero;
+        keyRect.offsetMin = new Vector2(KeyFaceSideInset, KeyFaceBottomInset);
+        keyRect.offsetMax = new Vector2(-KeyFaceSideInset, -KeyFaceTopInset);
         keyRect.localScale = Vector3.one;
 
-        DisableInheritedLocalization(keyLabelObject);
+        UiClones.DisableInheritedLocalization(keyLabelObject);
 
         TMP_Text keyLabel = keyLabelObject.GetComponent<TMP_Text>();
         keyLabel.alignment = TextAlignmentOptions.Center;
-        keyLabel.enableAutoSizing = true;
-        keyLabel.fontSizeMin = MinKeyLabelFontSize;
+
+        keyLabel.enableAutoSizing = false;
+        keyLabel.fontSize = rowLabel.fontSize * KeyFontScale - KeyFontSizeTrim;
+
+        keyLabel.color = KeyLabelColor;
+        keyLabel.fontStyle |= FontStyles.Bold;
 
         return keyLabel;
     }
