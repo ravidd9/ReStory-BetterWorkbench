@@ -103,6 +103,7 @@ Both take any Unity KeyCode name, e.g. `F`, `G`, `R`, `Tab`, `F6`.
 | `SafetyMargin`          | `0.005` | 0 – 0.05        | Extra collision padding safety around each part spot, in meters.                                                 |
 | `ShelfSlack`            | `1`     | 1 – 2.5         | How loosely the packed block spreads over the bench.                                                             |
 | `ControlsDisplayOffset` | `0.07`  | 0 – 0.4         | How far the controls UI display position is adjusted when switching sides.                                       |
+| `ClockBackgroundOpacity` | `0.75`  | 0 – 1           | How solid the workbench clock background panel is. 0 hides it, 1 makes it fully opaque.                          |
 | `TopMarginLeft`         | `0.05`  | 0 – 0.4         | Margin kept clear along the top edge of the bench. Applies when packing against the Left side.                   |
 | `TopMarginRight`        | `0.10`  | 0 – 0.4         | Margin kept clear along the top edge of the bench. Applies when packing against the Right side.                  |
 | `SideMarginLeft`        | `0.05`  | 0 – 0.4         | Margin kept clear along both the left and right edges of the bench. Applies when packing against the Left side.  |
