@@ -17,7 +17,6 @@ internal static class WorkbenchClock
     private const string PanelSpriteName = "ActionDescriptionBG (Sliced)";
     private const string IconSpriteName = "watch";
 
-    private const float PanelOpacity = 0.1f;
     private const float PanelScale = 0.75f;
     private const float IconSize = 44f;
 
@@ -26,6 +25,8 @@ internal static class WorkbenchClock
     private static readonly Color FallbackPanelColor = new(0.16f, 0.12f, 0.10f);
 
     private static GameObject _panel;
+    private static Image _panelImage;
+    private static Color _panelBaseColor;
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(WorkSurface), nameof(WorkSurface.ToggleDisassembleControlsAdvices))]
@@ -39,6 +40,11 @@ internal static class WorkbenchClock
         if (isActive && _panel == null)
         {
             Build();
+        }
+
+        if (isActive)
+        {
+            ApplyBackgroundOpacity();
         }
 
         if (_panel != null && _panel.activeSelf != isActive)
@@ -73,17 +79,18 @@ internal static class WorkbenchClock
         panelRect.localScale = Vector3.one * PanelScale;
 
         Image panelImage = _panel.GetComponent<Image>();
-        Sprite panelSprite = FindSprite(PanelSpriteName);
 
-        if (panelSprite != null)
+        Sprite panelSprite = FindSprite(PanelSpriteName);
+        Sprite roundedPanel = PanelArt.RoundedPanel();
+
+        if (roundedPanel != null)
         {
-            panelImage.sprite = panelSprite;
-            panelImage.type = panelSprite.border != Vector4.zero ? Image.Type.Sliced : Image.Type.Simple;
+            panelImage.sprite = roundedPanel;
+            panelImage.type = Image.Type.Sliced;
         }
 
-        Color panelColor = ColorTheGameUsesFor(panelSprite, FallbackPanelColor);
-        panelColor.a = PanelOpacity;
-        panelImage.color = panelColor;
+        _panelImage = panelImage;
+        _panelBaseColor = ColorTheGameUsesFor(panelSprite, FallbackPanelColor);
         panelImage.raycastTarget = false;
 
         HorizontalLayoutGroup layout = _panel.GetComponent<HorizontalLayoutGroup>();
@@ -103,6 +110,16 @@ internal static class WorkbenchClock
         AddGameClockClone(clockSource, calendar);
 
         Log.Debug("Workbench clock built.");
+    }
+
+    private static void ApplyBackgroundOpacity()
+    {
+        if (_panelImage == null)
+            return;
+
+        Color panelColor = _panelBaseColor;
+        panelColor.a = BetterWorkbenchPlugin.ClockBackgroundOpacity.Value;
+        _panelImage.color = panelColor;
     }
 
     private static bool IsCompetitionRunning()
