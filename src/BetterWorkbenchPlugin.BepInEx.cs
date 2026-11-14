@@ -1,4 +1,5 @@
 #if !MELONLOADER
+using System;
 using System.Collections.Generic;
 using System.IO;
 using BepInEx;
@@ -33,7 +34,7 @@ public partial class BetterWorkbenchPlugin : BaseUnityPlugin
 
         BindConfig();
         AddSectionSeparators();
-        new Harmony(PluginGuid).PatchAll();
+        ApplyPatches(new Harmony(PluginGuid));
 
         RunSelfChecks();
 
@@ -46,6 +47,25 @@ public partial class BetterWorkbenchPlugin : BaseUnityPlugin
     private void Update()
     {
         HandleHotkeys();
+    }
+
+    // PatchAll stops at the first patch class whose target a game update removed, silently leaving every class
+    // after it unpatched and the rest of Awake unrun. Patching class by class keeps one broken feature from taking
+    // the others down with it, and names the one that broke.
+    private static void ApplyPatches(Harmony harmony)
+    {
+        foreach (Type type in AccessTools.GetTypesFromAssembly(typeof(BetterWorkbenchPlugin).Assembly))
+        {
+            try
+            {
+                harmony.CreateClassProcessor(type).Patch();
+            }
+            catch (Exception exception)
+            {
+                Log.Error($"{type.Name} is disabled: it no longer matches the game, most likely after a game "
+                          + $"update. {exception.GetBaseException().Message}");
+            }
+        }
     }
 
     private void BindConfig()

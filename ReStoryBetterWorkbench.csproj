@@ -1,11 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Per-machine game path, kept out of git. Copy the GameDir line below into a file named
+       ReStoryBetterWorkbench.local.props (see README) when your game is not at the default Steam path. -->
+  <Import Project="$(MSBuildProjectName).local.props" Condition="Exists('$(MSBuildProjectName).local.props')" />
+
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>ReStoryBetterWorkbench</AssemblyName>
     <RootNamespace>ReStoryBetterWorkbench</RootNamespace>
     <LangVersion>latest</LangVersion>
-    <Version>1.4.0</Version>
+    <Version>1.4.1</Version>
     <!-- Unity ships its own facades; don't drag in NuGet reference assemblies. -->
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
@@ -13,8 +17,9 @@
     <!-- NU1701: MelonLoader ships a net35 assembly; Unity's Mono runtime loads it fine. -->
     <NoWarn>$(NoWarn);CS0436;NU1701</NoWarn>
 
-    <GameDir>A:\Program Files (x86)\Steam\steamapps\common\Restory</GameDir>
+    <GameDir Condition="'$(GameDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Restory</GameDir>
     <Managed>$(GameDir)\Restory_Data\Managed</Managed>
+    <BepInExCore>$(GameDir)\BepInEx\core</BepInExCore>
   </PropertyGroup>
 
   <!-- Mod loader flavor: default builds the BepInEx plugin, -p:Loader=Melon the MelonLoader mod. -->
@@ -32,23 +37,21 @@
     <IntermediateOutputPath>obj\$(Configuration)\Melon\</IntermediateOutputPath>
   </PropertyGroup>
 
+  <!-- The BepInEx build compiles against the BepInEx and Harmony that are actually installed in the game,
+       so what it is built against is exactly what it runs against. -->
   <ItemGroup Condition="'$(Loader)' != 'Melon'">
-    <Reference Include="$(PkgBepInEx_BaseLib)\lib\net35\BepInEx.dll" Private="false" />
-    <Reference Include="$(PkgHarmonyX)\lib\net35\0Harmony.dll" Private="false" />
+    <Reference Include="$(BepInExCore)\BepInEx.dll" Private="false" />
+    <Reference Include="$(BepInExCore)\0Harmony.dll" Private="false" />
   </ItemGroup>
 
-  <!-- Restored for both flavors, so switching flavors can't leave the restore state behind. NuGet only
-       downloads these; they are referenced by path like every other assembly here, so their .NET Standard
-       facades never end up fighting Unity's own mscorlib. 0.6.6 is the oldest supported loader and has no
-       transitive deps; the API used here is unchanged in 0.7.x, so the same DLL loads under both. BepInEx
-       comes from its own feed (see NuGet.config) so the plugin builds without BepInEx installed; 5.4.21 is
-       API-identical to the 5.4.23.x the README asks for. -->
-  <ItemGroup>
+  <!-- MelonLoader flavor only. NuGet only downloads these; they are referenced by path like every other
+       assembly here, so their .NET Standard facades never end up fighting Unity's own mscorlib. 0.6.6 is the
+       oldest supported loader and has no transitive deps; the API used here is unchanged in 0.7.x, so the
+       same DLL loads under both. -->
+  <ItemGroup Condition="'$(Loader)' == 'Melon'">
     <PackageReference Include="LavaGang.MelonLoader" Version="0.6.6"
                       GeneratePathProperty="true" ExcludeAssets="all" />
     <PackageReference Include="HarmonyX" Version="2.10.2"
-                      GeneratePathProperty="true" ExcludeAssets="all" />
-    <PackageReference Include="BepInEx.BaseLib" Version="5.4.21"
                       GeneratePathProperty="true" ExcludeAssets="all" />
   </ItemGroup>
 
@@ -79,6 +82,14 @@
     <Reference Include="$(Managed)\Restory.Assembly.dll" Private="false" />
     <Reference Include="$(Managed)\Mandragora.Helpers.Assembly.dll" Private="false" />
   </ItemGroup>
+
+  <!-- Fail early with a clear message instead of a wall of missing-type errors. -->
+  <Target Name="CheckGameDir" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(Managed)\Restory.Assembly.dll')"
+           Text="ReStory not found at '$(GameDir)'. Set GameDir in $(MSBuildProjectName).local.props (see README)." />
+    <Error Condition="'$(Loader)' != 'Melon' And !Exists('$(BepInExCore)\BepInEx.dll')"
+           Text="BepInEx not found at '$(BepInExCore)'. Install BepInEx 5 into the game folder first." />
+  </Target>
 
   <!-- Automatic deploy the build in the correct path. -->
   <Target Name="Deploy" AfterTargets="Build">
