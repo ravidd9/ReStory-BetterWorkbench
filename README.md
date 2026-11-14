@@ -114,8 +114,18 @@ Every description above is the same line the mod writes into your config file, s
 
 ## Building from source
 
-Requires the .NET SDK. The project references the game's own assemblies, so set `GameDir` in
-`ReStoryBetterWorkbench.csproj` to your ReStory install path if it differs from the default.
+Requires the .NET SDK. The project references the game's own assemblies from `Restory_Data\Managed`, and
+the BepInEx build also references `BepInEx.dll` and `0Harmony.dll` from the game's `BepInEx\core`. If your
+game is not at `C:\Program Files (x86)\Steam\steamapps\common\Restory`, create
+`ReStoryBetterWorkbench.local.props` next to the csproj (git ignores it):
+
+```xml
+<Project>
+  <PropertyGroup>
+    <GameDir>D:\Program Files (x86)\Steam\steamapps\common\Restory</GameDir>
+  </PropertyGroup>
+</Project>
+```
 
 ```
 dotnet build                            # Debug   - verbose per-action logging
@@ -123,8 +133,9 @@ dotnet build -c Release                 # Release - development logging compiled
 dotnet build -c Release -p:Loader=Melon # the MelonLoader build of the same source
 ```
 
-The BepInEx build lands in `BepInEx\plugins\ReStoryBetterWorkbench\`, the MelonLoader one in `Mods\`. You
-need neither loader installed to build. BepInEx, MelonLoader and Harmony all come from NuGet.
+The BepInEx build lands in `BepInEx\plugins\ReStoryBetterWorkbench\`, the MelonLoader one in `Mods\`. The
+BepInEx build needs BepInEx installed in the game. The MelonLoader build gets MelonLoader and Harmony from
+NuGet, so it needs neither loader installed.
 
 Every compiled file lives in `src\`. The SDK's default glob finds them, so adding a file needs no change
 to `ReStoryBetterWorkbench.csproj`. The key frame art stays in `Assets\`, where the csproj embeds it by
