@@ -66,7 +66,7 @@ internal static class ControlsDisplay
         if (hasAlreadyAddedRowsToThisBench)
             return;
 
-        GameObject gameRowTemplate = rows.GetChild(rows.childCount - 1).gameObject;
+        GameObject gameRowTemplate = PickRowTemplate(rows);
 
         bool hasAddedOrganizeRow = TryCloneRow(gameRowTemplate, rows, OrganizeRowName,
             out _organizeLabel, out _organizeKeyLabel);
@@ -105,17 +105,19 @@ internal static class ControlsDisplay
             new Vector3(mirroredX + outwardOffset, _displayHome.y, _displayHome.z);
     }
 
+    // The game used to show and hide the controls advice with ToggleDisassembleControlsAdvices(bool isActive). It
+    // now calls ActivateDisassembleControlsAdvices on every bench state change while the advice is up (its bool is
+    // about the separate hint sign, not visibility) and DeactivateDisassembleControlsAdvices to hide it.
     [HarmonyPostfix]
-    [HarmonyPatch(typeof(WorkSurface), nameof(WorkSurface.ToggleDisassembleControlsAdvices))]
-    private static void PositionOnShow(bool isActive)
+    [HarmonyPatch(typeof(WorkSurface), nameof(WorkSurface.ActivateDisassembleControlsAdvices))]
+    private static void PositionOnShow()
     {
         bool wasShown = _isShown;
-        _isShown = isActive;
+        _isShown = true;
 
-        bool isHiddenToShownEdge = isActive && !wasShown;
         bool hasNothingToPosition = _display == null || _surface == null;
 
-        if (!isHiddenToShownEdge || hasNothingToPosition)
+        if (wasShown || hasNothingToPosition)
             return;
 
         Bounds bench = BenchPacker.WorldBounds(_surface.SurfaceBoundary);
@@ -146,6 +148,29 @@ internal static class ControlsDisplay
         {
             PlaceAwayFrom(partsOnLeft > partsOnRight ? BenchAnchorSide.Left : BenchAnchorSide.Right, bench);
         }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(WorkSurface), nameof(WorkSurface.DeactivateDisassembleControlsAdvices))]
+    private static void ForgetShownOnHide()
+    {
+        _isShown = false;
+    }
+
+    // The bottom entry used to be a plain row. It is now HintContainer: a group holding the Hint row plus the
+    // gamepad-only Notepad and Inventory rows, which the game hides on keyboard and a clone never would. So take
+    // the last single row that switches its icon by controls type, the shape the key dressing below expects.
+    private static GameObject PickRowTemplate(Transform rows)
+    {
+        for (int rowIndex = rows.childCount - 1; rowIndex >= 0; rowIndex--)
+        {
+            Transform row = rows.GetChild(rowIndex);
+
+            if (row.GetComponent<GUI_ControlsTypeGameObjectsSwitcher>() != null)
+                return row.gameObject;
+        }
+
+        return rows.GetChild(rows.childCount - 1).gameObject;
     }
 
     [HarmonyPostfix]
